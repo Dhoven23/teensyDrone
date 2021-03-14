@@ -1,2 +1,3 @@
 # teensyDrone
-Extension of CapstoneProject repo for expansion and 
+Extension of CapstoneProject repo
+For pull requests, use this version
