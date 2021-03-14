@@ -6,12 +6,12 @@
 #define kd 0.01                          // Altitude PID derivative constant
 #define filtAlt 0.95                    // Altitude Estimation Filter constant
 #define LQRmult 0.475                  // Scaling factor for control law, varies between 0.5-1
-#define LQR_P 0.1                     // LQR_P constant
-#define LQR_E 1.75                   // Integrator 
+#define LQR_P 0.1                     // LQR_P constant proportional prescaler
+#define LQR_E 1.75                   // Integrator prescaler
 #define INTEGRATOR_CLAMP 0.15       // Clamping term for integrator #define filtPID 0.95 
 #define SLEW_LIMIT 10              // controller gimbal limit
 #define SLEW_FILTER 0.85          // Controller rate limiter (0-1), higher = slower/stabler
-#define D_COMP 0.075             // Coupling term for derivative. sets the derivative setpoints as a function of positional error
+#define D_COMP 0.075             // dynamic damping coefficient. higher = more dynamic, lower = more damping
 #define V_SPD 0.01              // Vertical speed reduction rate 
 
 /* ================================================================== =======================
@@ -24,7 +24,7 @@
 #define LIDAR_BAUDRATE 115200   // LiDAR sensor UART speed. default is 115200
 
 #ifndef USB_BAUDRATE
-#define USB_BAUDRATE 115200     // USB Serial port baudtate. (N/A for USB mode)
+#define USB_BAUDRATE 250000     // USB Serial port baudtate. (N/A for USB mode)
 #endif
 
 #ifndef SERIAL_USB
@@ -41,8 +41,8 @@
 
 
 #define CMD_SERIAL Serial       // Listen port for waypoints
-#define TELEMETRY1 Serial4
-#define TELEMETRY2 Serial
+#define TELEMETRY1 Serial4      // wireless telemetry
+#define TELEMETRY2 Serial       // wired telemetry
 
 
 /* ================================================================== =======================
@@ -52,8 +52,8 @@
 #define ESC2 7       // Pin for ESC2
 #define ESC3 5       // Pin for ESC3
 #define ESC4 4       // Pin for ESC4
-#define MAXVAL 1500
-#define MINVAL 900
+#define MAXVAL 1500  // highest speed controller may command esc
+#define MINVAL 900   // lowest speed controller may command esc (other than 0)
 
 /* Set the delay between iterations */
 #define MAIN_DELAY 1
