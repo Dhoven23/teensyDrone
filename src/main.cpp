@@ -37,6 +37,7 @@ void calibrateESCs() {
     esc2.write(i);
     esc3.write(i);
   }
+  
   for (int i = 20; i < 35; i++) {
     esc1.write(i);
     esc2.write(i);

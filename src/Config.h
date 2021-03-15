@@ -1,4 +1,4 @@
-/* ================================================================== ======================
+/* =========================================================================================
   Define controller constants */
 
 #define kp 2                               // Altitude PID proportional constant 
@@ -14,7 +14,7 @@
 #define D_COMP 0.075             // dynamic damping coefficient. higher = more dynamic, lower = more damping
 #define V_SPD 0.01              // Vertical speed reduction rate 
 
-/* ================================================================== =======================
+/* ==========================================================================================
   Define communication setup */
 
 #ifndef RADIO_BAUDRATE
@@ -40,12 +40,12 @@
 #endif
 
 
-#define CMD_SERIAL Serial       // Listen port for waypoints
-#define TELEMETRY1 Serial4      // wireless telemetry
-#define TELEMETRY2 Serial       // wired telemetry
+#define CMD_SERIAL Serial      // Listen port for waypoints
+#define TELEMETRY1 Serial      // wireless telemetry
+#define TELEMETRY2 Serial      // wired telemetry
 
 
-/* ================================================================== =======================
+/* ==========================================================================================
   Define motor setup */
 
 #define ESC1 6       // Pin for ESC1
