@@ -59,8 +59,6 @@ double X_Full [6] = {0, 0, 0, 0, 0, 0}, // RAM1 arrays
         X_int [6],
         X_old [6];
 
-
-
 char Dcode[3];
 
 uint16_t Ncode;
@@ -78,7 +76,6 @@ bool VERT_SPEED = false;
 
 /* ================================================================== ======================
   Declare Library Objects
-
 */
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28);
@@ -87,7 +84,6 @@ Servo esc1,
       esc2,
       esc3,
       esc4;
-
 
 /*-------------------------------------------------------------------------
    Write external functions
@@ -320,7 +316,7 @@ void commandESCs() {
 
 void printData() {
 
-  //TELEMETRY1.print(millis());
+  TELEMETRY1.print(millis());
   TELEMETRY1.print(", 1:,"), TELEMETRY1.print((int)e1);
   TELEMETRY1.print(", 2:,"), TELEMETRY1.print((int)e2);
   TELEMETRY1.print(", 3:,"), TELEMETRY1.print((int)e3);
@@ -354,10 +350,9 @@ void receiveData() {
     if ((CMD_SERIAL.read() == 0x20) && (CMD_SERIAL.read() == 0x20)) {
 
       char temp = CMD_SERIAL.read();
-
       uint16_t t1 = CMD_SERIAL.read();
       uint16_t t2 = CMD_SERIAL.read();
-
+    
       t2 <<= 8;
       t1 += t2;
 

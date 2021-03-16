@@ -4,15 +4,15 @@
 #define kp 2                               // Altitude PID proportional constant 
 #define ki 0                              // Altitude PID integral constant
 #define kd 0.01                          // Altitude PID derivative constant
-#define filtAlt 0.95                    // Altitude Estimation Filter constant
+#define filtAlt 0.95                    // Altitude Estimation Filter constant (0-1)
 #define LQRmult 0.475                  // Scaling factor for control law, varies between 0.5-1
 #define LQR_P 0.1                     // LQR_P constant proportional prescaler
 #define LQR_E 1.75                   // Integrator prescaler
 #define INTEGRATOR_CLAMP 0.15       // Clamping term for integrator #define filtPID 0.95 
-#define SLEW_LIMIT 10              // controller gimbal limit
+#define SLEW_LIMIT 10              // controller gimbal limit (higher = faster vehicle)
 #define SLEW_FILTER 0.85          // Controller rate limiter (0-1), higher = slower/stabler
 #define D_COMP 0.075             // dynamic damping coefficient. higher = more dynamic, lower = more damping
-#define V_SPD 0.01              // Vertical speed reduction rate 
+#define V_SPD 0.01              // Vertical speed reduction rate (depends on iteration time, faster code = lower value, typically 0.001-0.01)
 
 /* ==========================================================================================
   Define communication setup */
@@ -39,11 +39,9 @@
 #define LIDAR_SERIAL Serial1    // Serial port for LiDAR sensor
 #endif
 
-
 #define CMD_SERIAL Serial      // Listen port for waypoints
-#define TELEMETRY1 Serial      // wireless telemetry
+#define TELEMETRY1 Serial4      // wireless telemetry
 #define TELEMETRY2 Serial      // wired telemetry
-
 
 /* ==========================================================================================
   Define motor setup */
