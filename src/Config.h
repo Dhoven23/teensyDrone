@@ -13,6 +13,7 @@
 #define SLEW_FILTER 0.85          // Controller rate limiter (0-1), higher = slower/stabler
 #define D_COMP 0.075             // dynamic damping coefficient. higher = more dynamic, lower = more damping
 #define V_SPD 0.01              // Vertical speed reduction rate (depends on iteration time, faster code = lower value, typically 0.001-0.01)
+#define DERIVATIVE_FILT 0.9     // Fintering term for low pass derivative filter
 
 /* ==========================================================================================
   Define communication setup */
@@ -40,18 +41,19 @@
 #endif
 
 #define CMD_SERIAL Serial      // Listen port for waypoints
-#define TELEMETRY1 Serial4      // wireless telemetry
+#define TELEMETRY1 Serial4     // wireless telemetry
 #define TELEMETRY2 Serial      // wired telemetry
 
 /* ==========================================================================================
   Define motor setup */
 
-#define ESC1 6       // Pin for ESC1
-#define ESC2 7       // Pin for ESC2
-#define ESC3 5       // Pin for ESC3
-#define ESC4 4       // Pin for ESC4
-#define MAXVAL 1500  // highest speed controller may command esc
-#define MINVAL 900   // lowest speed controller may command esc (other than 0)
+#define ESC1 6         // Pin for ESC1
+#define ESC2 7         // Pin for ESC2
+#define ESC3 5         // Pin for ESC3
+#define ESC4 4         // Pin for ESC4
+#define MAXVAL 1500    // highest speed controller may command esc
+#define MINVAL 900     // lowest speed controller may command esc (other than 0)
+#define IDLE_SPEED 15  // idle motor speed, range 12-20 ish, depending on esc calibration
 
 /* Set the delay between iterations */
 #define MAIN_DELAY 1

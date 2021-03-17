@@ -6,7 +6,8 @@
   Author: Daniel Hoven Date: 3/15/2021 Project: Senior Capstone
   --------------------------------------------------------------------------------------*/
 /*= == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == = == == == == == == == =
-       SETUP */
+SETUP 
+*/
 
 void set_liDAR() {
   LIDAR_SERIAL.write(0x42);
@@ -90,13 +91,13 @@ void setup()
   delay(10);
 
   get_IMU_sample();
-  R[0] = roll;
-  R[1] = pitch;
-  R[2] = yaw;
+  setPoint.R[0] = euler.x;
+  setPoint.R[1] = euler.y;
+  setPoint.R[2] = euler.z;
 
-  Rcal[0] = R[0];
-  Rcal[1] = R[1];
-  Rcal[2] = R[2];
+  setPoint.Rcal[0] = setPoint.R[0];
+  setPoint.Rcal[1] = setPoint.R[1];
+  setPoint.Rcal[2] = setPoint.R[2];
   delay(500);
   bool check = false;
   while (!check) {
@@ -127,10 +128,10 @@ void loop(void) {
 
   _lidar = (1 - filtAlt) * liDARval + filtAlt * liDARold;
   liDARold = _lidar;
-  double _alt = _lidar * cos(roll) * cos(pitch);
-  d_alt *= filtAlt;
-  d_alt += (1 - filtAlt) * (_alt - alt) / dt;
-  alt = _alt;
+  double _alt = _lidar * cos(euler.x) * cos(euler.y);
+  altitude.d_alt *= filtAlt;
+  altitude.d_alt += (1 - filtAlt) * (_alt - altitude.alt) / dt;
+  altitude.alt = _alt;
 
 
   get_IMU_sample();
@@ -142,7 +143,7 @@ void loop(void) {
   }
   receiveData();
 
-  if(millis()%50<5){
+  if(count%5==0){
     printData();
   }
 
@@ -155,7 +156,7 @@ void loop(void) {
 
   if (count < 1000) {
     for (int i = 1; i < 4; i++) {
-      Ucal[i] = U[i];
+      signal.Ucal[i] = signal.U[i];
     }
 
   } else {
