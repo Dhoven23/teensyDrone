@@ -11,14 +11,6 @@
 /* ================================================================== =======================
   Declare globals */
 
-int cycletime = 0,
-    count = 0,
-    pos = 0,
-    t = 0,
-    i = 0,
-    E_old,
-    tim_old = 0;
-
 struct Signal
 {
   float e1 = 0,
@@ -81,12 +73,8 @@ struct Setpoint
   double verticalSpeed = 0;
 };
 
-char Dcode[3];
-
-double dt = 0;
-
 uint16_t Ncode;
-
+char Dcode[3];
 String STATE = "STARTUP";
 
 bool STOP_FLAG = false;
@@ -113,7 +101,58 @@ Servo esc1,
 /*-------------------------------------------------------------------------
    Write external functions
   ---------------------------------------------------------------------------*/
-FASTRUN void get_IMU_sample()
+
+void set_liDAR()
+{
+  LIDAR_SERIAL.write(0x42);
+  LIDAR_SERIAL.write(0x57);
+  LIDAR_SERIAL.write(0x02);
+  LIDAR_SERIAL.write(0x00);
+  LIDAR_SERIAL.write(0x00);
+  LIDAR_SERIAL.write(0x00);
+  LIDAR_SERIAL.write(0x01);
+  LIDAR_SERIAL.write(0x06);
+}
+
+void calibrateESCs()
+{
+
+  esc1.attach(ESC1);
+  esc2.attach(ESC2);
+  esc3.attach(ESC3);
+  esc4.attach(ESC4);
+  delay(100);
+  esc1.write(30);
+  esc2.write(30);
+  esc3.write(30);
+  esc4.write(30);
+  delay(1000);
+
+  for (int i = 30; i > 20; i--)
+  {
+    esc1.write(i);
+    esc2.write(i);
+    esc3.write(i);
+  }
+
+  for (int i = 20; i < 35; i++)
+  {
+    esc1.write(i);
+    esc2.write(i);
+    esc3.write(i);
+    esc4.write(i);
+    delay(150);
+  }
+  delay(2000);
+  esc1.write(40);
+  esc2.write(40);
+  esc3.write(40);
+  esc4.write(40);
+  delay(2000);
+}
+
+
+FASTRUN void get_IMU_sample(double dt, double iterations)
 {
 
   /* get quaternions */
@@ -152,7 +191,7 @@ FASTRUN void get_IMU_sample()
     double temp;
     temp = (-1) * euler.Hist[i][0] + (8) * euler.Hist[i][1] + (-8) * euler.Hist[i][3] + (1) * euler.Hist[i][4];
     temp /= 12 * h;
-    if (count > 5)
+    if (iterations > 5)
     {
       X.Full[i + 3] = DERIVATIVE_FILT * X.Old[i + 3];
       X.Full[i + 3] += (1 - DERIVATIVE_FILT) * temp;
@@ -164,7 +203,7 @@ FASTRUN void get_IMU_sample()
   }
 }
 
-void get_Distance_sample()
+void get_Distance_sample(double dt)
 {
 
   if (LIDAR_SERIAL.available() >= 9) // When at least 9 bytes of data available (expected number of bytes for 1 signal), then read
@@ -231,7 +270,7 @@ FASTRUN void ELQR_calc()
   }
 }
 
-FASTRUN void IntegralTracker()
+FASTRUN void IntegralTracker(double dt)
 {
 
   for (int i = 0; i < 3; i++)

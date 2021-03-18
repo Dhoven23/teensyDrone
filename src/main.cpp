@@ -9,54 +9,21 @@
 SETUP 
 */
 
-void set_liDAR()
+struct Global
 {
-  LIDAR_SERIAL.write(0x42);
-  LIDAR_SERIAL.write(0x57);
-  LIDAR_SERIAL.write(0x02);
-  LIDAR_SERIAL.write(0x00);
-  LIDAR_SERIAL.write(0x00);
-  LIDAR_SERIAL.write(0x00);
-  LIDAR_SERIAL.write(0x01);
-  LIDAR_SERIAL.write(0x06);
-}
+  long int iterations = 0;
+  int tMicros = 0;
+  double dt = 0;
 
-void calibrateESCs()
-{
+  String STATE = "STARTUP";
 
-  esc1.attach(ESC1);
-  esc2.attach(ESC2);
-  esc3.attach(ESC3);
-  esc4.attach(ESC4);
-  delay(100);
-  esc1.write(30);
-  esc2.write(30);
-  esc3.write(30);
-  esc4.write(30);
-  delay(1000);
+  bool STOP_FLAG = false,
+       TAKEOFF_FLAG = true,
+       VERT_SPEED = false;
 
-  for (int i = 30; i > 20; i--)
-  {
-    esc1.write(i);
-    esc2.write(i);
-    esc3.write(i);
-  }
+};
 
-  for (int i = 20; i < 35; i++)
-  {
-    esc1.write(i);
-    esc2.write(i);
-    esc3.write(i);
-    esc4.write(i);
-    delay(150);
-  }
-  delay(2000);
-  esc1.write(40);
-  esc2.write(40);
-  esc3.write(40);
-  esc4.write(40);
-  delay(2000);
-}
+Global global;
 
 void setup()
 
@@ -93,10 +60,10 @@ void setup()
   calibrateESCs();
   delay(500);
 
-  get_IMU_sample();
+  get_IMU_sample(global.dt, global.iterations);
   delay(10);
 
-  get_IMU_sample();
+  get_IMU_sample(0.1, 0.1);
   setPoint.R[0] = euler.x;
   setPoint.R[1] = euler.y;
   setPoint.R[2] = euler.z;
@@ -108,11 +75,11 @@ void setup()
   bool check = false;
   while (!check)
   {
-    get_Distance_sample();
-    int t1 = liDARval;
+    get_Distance_sample(global.dt);
+    int t1 = altitude.alt;
     delay(100);
-    get_Distance_sample();
-    int t2 = liDARval;
+    get_Distance_sample(global.dt);
+    int t2 = altitude.alt;
     if (t1 == t2)
     {
       check = true;
@@ -127,12 +94,12 @@ void setup()
 void loop(void)
 {
 
-  dt = micros() - t;
-  t = micros();
-  dt = dt / 1000000;
+  global.dt = micros() - global.tMicros;
+  global.tMicros = micros();
+  global.dt = global.dt / 1000000;
 
-  get_IMU_sample(),
-      get_Distance_sample(),
+  get_IMU_sample(global.dt,global.iterations),
+      get_Distance_sample(global.dt),
           ELQR_calc();
 
   if (VERT_SPEED == true)
@@ -141,7 +108,7 @@ void loop(void)
   }
   receiveData();
 
-  if (count % 5 == 0)
+  if (global.iterations % 5 == 0)
   {
     printData();
   }
@@ -151,10 +118,10 @@ void loop(void)
 
   if ((TAKEOFF_FLAG) && (millis() > 2000))
   {
-    IntegralTracker();
+    IntegralTracker(global.dt);
   }
 
-  if (count < 1000)
+  if (global.iterations < 1000)
   {
     for (int i = 1; i < 4; i++)
     {
@@ -172,6 +139,8 @@ void loop(void)
       STOP();
     }
   }
-  count++;
+
+  global.iterations++;
+
   delay(MAIN_DELAY);
 }
