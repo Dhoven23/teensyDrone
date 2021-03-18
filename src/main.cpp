@@ -20,7 +20,6 @@ struct Global
   bool STOP_FLAG = false,
        TAKEOFF_FLAG = true,
        VERT_SPEED = false;
-
 };
 
 Global global;
@@ -98,9 +97,9 @@ void loop(void)
   global.tMicros = micros();
   global.dt = global.dt / 1000000;
 
-  get_IMU_sample(global.dt,global.iterations),
+  get_IMU_sample(global.dt, global.iterations),
       get_Distance_sample(global.dt),
-          ELQR_calc();
+      ELQR_calc();
 
   if (VERT_SPEED == true)
   {
