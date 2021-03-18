@@ -19,14 +19,15 @@ int cycletime = 0,
     E_old,
     tim_old = 0;
 
-struct Signal {
+struct Signal
+{
   float e1 = 0,
         e2 = 0,
         e3 = 0,
         e4 = 0,
-        Ecal[4] = {0, 0, 0, 0}; 
+        Ecal[4] = {0, 0, 0, 0};
 
-  double U [4] = {IDLE_SPEED, 0, 0, 0},
+  double U[4] = {IDLE_SPEED, 0, 0, 0},
          Ucal[4];
 };
 
@@ -44,7 +45,8 @@ unsigned int checksum = 0,
 volatile int liDARval = 0,
              strength = 0;
 
-struct Euler{
+struct Euler
+{
   double x = 0,
          y = 0,
          z = 0;
@@ -56,21 +58,24 @@ struct Euler{
   double Hist[3][5];
 };
 
-struct State{
+struct State
+{
   double Full[6] = {0, 0, 0, 0, 0, 0},
          Integral[6],
          Old[6];
   double Error[6];
 };
 
-struct Altitude {
+struct Altitude
+{
   double alt = 0,
          d_alt = 0,
          initAlt = 0;
 };
 
-struct Setpoint{
-  double R[6] = {0,0,0,0,0,0};
+struct Setpoint
+{
+  double R[6] = {0, 0, 0, 0, 0, 0};
   double Alt = 0;
   double Rcal[3] = {0, 0, 0};
   double verticalSpeed = 0;
@@ -88,12 +93,11 @@ bool STOP_FLAG = false;
 bool TAKEOFF_FLAG = true;
 bool VERT_SPEED = false;
 
-
-State X;              // Vehicle Full state struct
-Euler euler;          // Euler angle struct
-Setpoint setPoint;    // setpoint struct
-Altitude altitude;    // altitude data
-Signal signal;        // controller output data
+State X;           // Vehicle Full state struct
+Euler euler;       // Euler angle struct
+Setpoint setPoint; // setpoint struct
+Altitude altitude; // altitude data
+Signal signal;     // controller output data
 
 /* ================================================================== ======================
   Declare Library Objects
@@ -102,14 +106,15 @@ Signal signal;        // controller output data
 Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28);
 
 Servo esc1,
-      esc2,
-      esc3,
-      esc4;
+    esc2,
+    esc3,
+    esc4;
 
 /*-------------------------------------------------------------------------
    Write external functions
   ---------------------------------------------------------------------------*/
-FASTRUN void get_IMU_sample() {
+FASTRUN void get_IMU_sample()
+{
 
   /* get quaternions */
 
@@ -122,11 +127,12 @@ FASTRUN void get_IMU_sample() {
 
   //quaternion conversion
 
-  euler.x = (-setPoint.Rcal[0]) - atan2(2.0 * (q3 * q2 + q0 * q1), 1.0 - 2.0 * (q1 * q1 + q2 * q2)); //* (180/PI);
-  euler.y = (-setPoint.Rcal[1]) + asin(2.0 * (q2 * q0 - q3 * q1));// * (180/PI);
+  euler.x = (-setPoint.Rcal[0]) - atan2(2.0 * (q3 * q2 + q0 * q1), 1.0 - 2.0 * (q1 * q1 + q2 * q2));  //* (180/PI);
+  euler.y = (-setPoint.Rcal[1]) + asin(2.0 * (q2 * q0 - q3 * q1));                                    // * (180/PI);
   euler.z = (-setPoint.Rcal[2]) - atan2(2.0 * (q3 * q0 + q1 * q2), -1.0 + 2.0 * (q0 * q0 + q1 * q1)); //* (180/PI);
 
-  for (int i = 0; i < 6; i++) {
+  for (int i = 0; i < 6; i++)
+  {
     X.Old[i] = X.Full[i];
   }
 
@@ -136,20 +142,30 @@ FASTRUN void get_IMU_sample() {
 
   // Compute Derivatives using 5 point stencil
   double h = dt;
-  for (int i = 0; i < 3; i++) {
-    for (int j = 1; j < 5; j++) {
+  for (int i = 0; i < 3; i++)
+  {
+    for (int j = 1; j < 5; j++)
+    {
       euler.Hist[i][j] = euler.Hist[i][j - 1];
     }
     euler.Hist[i][0] = X.Full[i];
     double temp;
     temp = (-1) * euler.Hist[i][0] + (8) * euler.Hist[i][1] + (-8) * euler.Hist[i][3] + (1) * euler.Hist[i][4];
-    temp /= 12 * h; 
-    X.Full[i + 3] *= DERIVATIVE_FILT;
-    X.Full[i + 3] += (1-DERIVATIVE_FILT) * temp;
+    temp /= 12 * h;
+    if (count > 5)
+    {
+      X.Full[i + 3] = DERIVATIVE_FILT * X.Old[i + 3];
+      X.Full[i + 3] += (1 - DERIVATIVE_FILT) * temp;
+    }
+    else
+    {
+      X.Full[i + 3] = .1;
+    }
   }
 }
 
-void get_Distance_sample() {
+void get_Distance_sample()
+{
 
   if (LIDAR_SERIAL.available() >= 9) // When at least 9 bytes of data available (expected number of bytes for 1 signal), then read
   {
@@ -165,82 +181,114 @@ void get_Distance_sample() {
       t2 <<= 8;
       t2 += t1;
       strength = t2;
-      for (int i = 0; i < 3; i++)LIDAR_SERIAL.read(); // ignore remaining bytes
+      for (int i = 0; i < 3; i++)
+        LIDAR_SERIAL.read(); // ignore remaining bytes
     }
   }
+  _lidar = (1 - filtAlt) * liDARval + filtAlt * liDARold;
+  liDARold = _lidar;
+  double _alt = _lidar * cos(euler.x) * cos(euler.y);
+  altitude.d_alt *= filtAlt;
+  altitude.d_alt += (1 - filtAlt) * (_alt - altitude.alt) / dt;
+  altitude.alt = _alt;
 }
 
-FASTRUN void DerivativeComp() {
-  for (int i = 0; i < 3; i++) {
+FASTRUN void DerivativeComp()
+{
+  for (int i = 0; i < 3; i++)
+  {
     setPoint.R[i + 3] = D_COMP * (X.Full[i] - setPoint.R[i]);
   }
 }
 
-FASTRUN void ELQR_calc() {
+FASTRUN void ELQR_calc()
+{
 
-  for (int i = 1; i < 4; i++) {
+  for (int i = 1; i < 4; i++)
+  {
     double iter = 0;
-    for (int j = 0; j < 3; j++) {
+    for (int j = 0; j < 3; j++)
+    {
       iter += K[i][j] * ((X.Full[j] - setPoint.R[j]) + LQR_E * (X.Integral[j]));
     }
-    for (int j = 3; j < 6; j++) {
+    for (int j = 3; j < 6; j++)
+    {
       iter += K[i][j] * ((X.Full[j] - setPoint.R[j]) + LQR_P * (X.Integral[j]));
     }
-    if (abs(iter) < SLEW_LIMIT) {
+    if (abs(iter) < SLEW_LIMIT)
+    {
       signal.U[i] = iter;
       signal.U[i] -= signal.Ucal[i];
     }
-    else if (iter > 0) {
+    else if (iter > 0)
+    {
       signal.U[i] = SLEW_LIMIT;
     }
-    else if (iter < 0) {
+    else if (iter < 0)
+    {
       signal.U[i] = -SLEW_LIMIT;
     }
-
   }
 }
 
-FASTRUN void IntegralTracker() {
+FASTRUN void IntegralTracker()
+{
 
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; i++)
+  {
     double iter = (dt / 2) * (X.Old[i] + X.Full[i]);
-    if ((abs(iter) + abs(X.Integral[i])) < INTEGRATOR_CLAMP) {
+    if ((abs(iter) + abs(X.Integral[i])) < INTEGRATOR_CLAMP)
+    {
       X.Integral[i] += iter;
       X.Integral[i + 3] = X.Full[i];
-    } else if ((iter + X.Integral[i]) < -INTEGRATOR_CLAMP) {
+    }
+    else if ((iter + X.Integral[i]) < -INTEGRATOR_CLAMP)
+    {
       X.Integral[i] += 0.01;
       X.Integral[i + 3] = X.Full[i];
-    } else if ((iter + X.Integral[i]) > INTEGRATOR_CLAMP) {
+    }
+    else if ((iter + X.Integral[i]) > INTEGRATOR_CLAMP)
+    {
       X.Integral[i] -= 0.01;
       X.Integral[i + 3] = X.Full[i];
     }
   }
-  for (int i = 0; i < 3; i++) {
-    if (abs(X.Integral[i] - setPoint.R[i]) > INTEGRATOR_CLAMP) {
-      if ((X.Integral[i] - setPoint.R[i]) > 0) {
+  for (int i = 0; i < 3; i++)
+  {
+    if (abs(X.Integral[i] - setPoint.R[i]) > INTEGRATOR_CLAMP)
+    {
+      if ((X.Integral[i] - setPoint.R[i]) > 0)
+      {
         X.Integral[i] = INTEGRATOR_CLAMP + setPoint.R[i] - 0.01;
-      } else if ((X.Integral[i] - setPoint.R[i]) < 0) {
+      }
+      else if ((X.Integral[i] - setPoint.R[i]) < 0)
+      {
         X.Integral[i] = -(INTEGRATOR_CLAMP + setPoint.R[i]) + 0.01;
       }
     }
   }
 }
 
-bool goingToCrash() {
+bool goingToCrash()
+{
   return false;
 }
 
-bool upsideDown() {
+bool upsideDown()
+{
   bool check = false;
-  for (int i = 0; i < 2; i++) {
-    if (abs(X.Full[i]) > PI / 6) {
+  for (int i = 0; i < 2; i++)
+  {
+    if (abs(X.Full[i]) > PI / 6)
+    {
       check = true;
     }
   }
   return check;
 }
 
-void STOP() {
+void STOP()
+{
   Serial.println("------ CRASH CONDITION DETECTED!! -------");
   signal.e1 = 0;
   signal.e2 = 0;
@@ -251,16 +299,24 @@ void STOP() {
   esc3.write(30);
   esc4.write(30);
 }
-void OS() {
-  if (upsideDown()) {
+void OS()
+{
+  if (upsideDown())
+  {
     STOP();
     STOP_FLAG = true;
-  } else if (goingToCrash()) {
+  }
+  else if (goingToCrash())
+  {
     STOP();
-  } else {}
+  }
+  else
+  {
+  }
 }
 
-void vertSpeedHold() {
+void vertSpeedHold()
+{
   double ERR = setPoint.verticalSpeed - altitude.d_alt;
   signal.e1 += ERR * V_SPD;
   signal.e2 += ERR * V_SPD;
@@ -268,7 +324,15 @@ void vertSpeedHold() {
   signal.e4 += ERR * V_SPD;
 }
 
-void commandESCs() {
+void AltitudePID()
+{
+  double AltitudeError = setPoint.Alt - altitude.alt;
+  setPoint.verticalSpeed = kp*AltitudeError + kd*altitude.d_alt;
+
+}
+
+void commandESCs()
+{
   // Motor Mixing Algorithm
 
   float _e1 = signal.U[0] - signal.U[1] + signal.U[2] + signal.U[3];
@@ -291,7 +355,8 @@ void commandESCs() {
   signal.e3 += (1 - SLEW_FILTER) * _e3;
   signal.e4 += (1 - SLEW_FILTER) * _e4;
 
-  if ((signal.Ecal[0] + signal.Ecal[1] + signal.Ecal[2] + signal.Ecal[3]) == 0) {
+  if ((signal.Ecal[0] + signal.Ecal[1] + signal.Ecal[2] + signal.Ecal[3]) == 0)
+  {
 
     float eAv = (signal.e1 + signal.e2 + signal.e3 + signal.e4) / 4;
     signal.Ecal[0] = eAv - signal.e1;
@@ -305,38 +370,59 @@ void commandESCs() {
   signal.e3 += signal.Ecal[2];
   signal.e4 += signal.Ecal[3];
 
-  if ((signal.e1 < MAXVAL) && (signal.e1 > MINVAL)) {
+  if ((signal.e1 < MAXVAL) && (signal.e1 > MINVAL))
+  {
     esc1.writeMicroseconds((int)signal.e1);
-  } else if (signal.e1 < MINVAL) {
+  }
+  else if (signal.e1 < MINVAL)
+  {
     signal.e1 = MINVAL + 1;
-  } else if (signal.e1 > MAXVAL) {
+  }
+  else if (signal.e1 > MAXVAL)
+  {
     signal.e1 = MAXVAL - 1;
   }
 
-  if ((signal.e2 < MAXVAL) && (signal.e2 > MINVAL)) {
+  if ((signal.e2 < MAXVAL) && (signal.e2 > MINVAL))
+  {
     esc2.writeMicroseconds((int)signal.e2);
-  } else if (signal.e2 < MINVAL) {
+  }
+  else if (signal.e2 < MINVAL)
+  {
     signal.e2 = MINVAL + 1;
-  } else if (signal.e2 > MAXVAL) {
+  }
+  else if (signal.e2 > MAXVAL)
+  {
     signal.e2 = MAXVAL - 1;
   }
-  if ((signal.e3 < MAXVAL) && (signal.e3 > MINVAL)) {
+  if ((signal.e3 < MAXVAL) && (signal.e3 > MINVAL))
+  {
     esc3.writeMicroseconds((int)signal.e3);
-  } else if (signal.e3 < MINVAL) {
+  }
+  else if (signal.e3 < MINVAL)
+  {
     signal.e3 = MINVAL + 1;
-  } else if (signal.e3 > MAXVAL) {
+  }
+  else if (signal.e3 > MAXVAL)
+  {
     signal.e3 = MAXVAL - 1;
   }
-  if ((signal.e4 < MAXVAL) && (signal.e4 > MINVAL)) {
+  if ((signal.e4 < MAXVAL) && (signal.e4 > MINVAL))
+  {
     esc4.writeMicroseconds((int)signal.e4);
-  } else if (signal.e4 < MINVAL) {
+  }
+  else if (signal.e4 < MINVAL)
+  {
     signal.e4 = MINVAL + 1;
-  } else if (signal.e4 > MAXVAL) {
+  }
+  else if (signal.e4 > MAXVAL)
+  {
     signal.e4 = MAXVAL - 1;
   }
 }
 
-void printData() {
+void printData()
+{
 
   TELEMETRY1.print(millis());
   TELEMETRY1.print(", 1:,"), TELEMETRY1.print((int)signal.e1);
@@ -351,94 +437,130 @@ void printData() {
   TELEMETRY1.print(", "), TELEMETRY1.print(X.Full[4], 3);
   TELEMETRY1.print(", "), TELEMETRY1.print(X.Full[5], 3);
   TELEMETRY1.print("Alt:,"), TELEMETRY1.print(altitude.alt);
-  if (TAKEOFF_FLAG) {
+  if (TAKEOFF_FLAG)
+  {
     TELEMETRY1.print(",Integrators ON, ");
-  } else {
+  }
+  else
+  {
     TELEMETRY1.print(",Integrators OFF, ");
   }
-  if (VERT_SPEED) {
+  if (VERT_SPEED)
+  {
     TELEMETRY1.print(", VERT_SPD_HOLD = true");
-  } else {
+  }
+  else
+  {
     TELEMETRY1.print(", VERT_SPD_HOLD = false");
   }
   TELEMETRY1.println();
 }
 
+void receiveData()
+{
 
-void receiveData() {
+  if (CMD_SERIAL.available() >= 5)
+  {
 
-  if (CMD_SERIAL.available() >= 5) {
-
-    if ((CMD_SERIAL.read() == 0x20) && (CMD_SERIAL.read() == 0x20)) {
+    if ((CMD_SERIAL.read() == 0x20) && (CMD_SERIAL.read() == 0x20))
+    {
 
       char temp = CMD_SERIAL.read();
       uint16_t t1 = CMD_SERIAL.read();
       uint16_t t2 = CMD_SERIAL.read();
-    
+
       t2 <<= 8;
       t1 += t2;
 
-      if (!((Dcode[0] == 'N') || (Dcode[1] == 'A'))) {
+      if (!((Dcode[0] == 'N') || (Dcode[1] == 'A')))
+      {
         Ncode = t1;
 
-        if (temp == 'a') {
+        if (temp == 'a')
+        {
           Dcode[0] = '-', Dcode[1] = 'x';
           setPoint.R[0] += 0.01;
           digitalWrite(13, HIGH);
-        } else if (temp == 'w') {
+        }
+        else if (temp == 'w')
+        {
           Dcode[0] = '+', Dcode[1] = 'y';
           setPoint.R[1] += 0.01;
           digitalWrite(13, HIGH);
-        } else if (temp == 's') {
-          Dcode[0] = '-', Dcode[1] = 'y'; 
+        }
+        else if (temp == 's')
+        {
+          Dcode[0] = '-', Dcode[1] = 'y';
           setPoint.R[1] -= 0.01;
           digitalWrite(13, HIGH);
-        } else if (temp == 'd') {
+        }
+        else if (temp == 'd')
+        {
           Dcode[0] = '+', Dcode[1] = 'x';
           setPoint.R[0] -= 0.01;
           digitalWrite(13, HIGH);
-        } else if (temp == 'q') {
+        }
+        else if (temp == 'q')
+        {
           signal.U[3] += 1;
-        } else if (temp == 'e') {
+        }
+        else if (temp == 'e')
+        {
           signal.U[3] -= 1;
-        } else if (temp == 'V') {
+        }
+        else if (temp == 'V')
+        {
           VERT_SPEED = !VERT_SPEED;
-        } else if (temp == 'I') {
+        }
+        else if (temp == 'I')
+        {
           TAKEOFF_FLAG = !(TAKEOFF_FLAG);
-        } else if (temp == 'H') {
+        }
+        else if (temp == 'H')
+        {
           Dcode[0] = 'H',
-                     Dcode[1] = 'O';
+          Dcode[1] = 'O';
           setPoint.R[0] = setPoint.Rcal[0];
           setPoint.R[1] = setPoint.Rcal[1];
           STOP_FLAG = false;
 
           digitalWrite(13, HIGH);
-        } else if (temp == 'Y') {
+        }
+        else if (temp == 'Y')
+        {
           STOP_FLAG = false;
-        } else if (temp == 'r') {
+        }
+        else if (temp == 'r')
+        {
           Dcode[0] = '+',
-                     Dcode[1] = 'z';
+          Dcode[1] = 'z';
           signal.U[0] += t1;
           VERT_SPEED = false;
-        } else if (temp == 'f') {
+        }
+        else if (temp == 'f')
+        {
           Dcode[0] = '-',
-                     Dcode[1] = 'z';
-                                signal.U[0] -= t1;
+          Dcode[1] = 'z';
+          signal.U[0] -= t1;
           VERT_SPEED = false;
 
           digitalWrite(13, HIGH);
-        } else if (temp == 'K') {
+        }
+        else if (temp == 'K')
+        {
           signal.U[0] = 0;
           STOP_FLAG = true;
-
-        } else {
+        }
+        else
+        {
           Dcode[0] = 'N', Dcode[1] = 'A';
         }
-
       }
       digitalWrite(13, LOW);
     }
-  } else {
+  }
+  else
+  {
     digitalWrite(13, LOW);
   }
 }

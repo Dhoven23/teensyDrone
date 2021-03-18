@@ -13,7 +13,7 @@
 #define SLEW_FILTER 0.85          // Controller rate limiter (0-1), higher = slower/stabler
 #define D_COMP 0.075             // dynamic damping coefficient. higher = more dynamic, lower = more damping
 #define V_SPD 0.01              // Vertical speed reduction rate (depends on iteration time, faster code = lower value, typically 0.001-0.01)
-#define DERIVATIVE_FILT 0.9     // Fintering term for low pass derivative filter
+#define DERIVATIVE_FILT 0.75   // Fintering term for low pass derivative filter
 
 /* ==========================================================================================
   Define communication setup */

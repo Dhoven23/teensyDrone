@@ -9,7 +9,8 @@
 SETUP 
 */
 
-void set_liDAR() {
+void set_liDAR()
+{
   LIDAR_SERIAL.write(0x42);
   LIDAR_SERIAL.write(0x57);
   LIDAR_SERIAL.write(0x02);
@@ -20,7 +21,8 @@ void set_liDAR() {
   LIDAR_SERIAL.write(0x06);
 }
 
-void calibrateESCs() {
+void calibrateESCs()
+{
 
   esc1.attach(ESC1);
   esc2.attach(ESC2);
@@ -33,13 +35,15 @@ void calibrateESCs() {
   esc4.write(30);
   delay(1000);
 
-  for (int i = 30; i > 20; i--) {
+  for (int i = 30; i > 20; i--)
+  {
     esc1.write(i);
     esc2.write(i);
     esc3.write(i);
   }
-  
-  for (int i = 20; i < 35; i++) {
+
+  for (int i = 20; i < 35; i++)
+  {
     esc1.write(i);
     esc2.write(i);
     esc3.write(i);
@@ -53,7 +57,6 @@ void calibrateESCs() {
   esc4.write(40);
   delay(2000);
 }
-
 
 void setup()
 
@@ -69,7 +72,8 @@ void setup()
 
   set_liDAR();
 
-  while (!bno.begin()) {
+  while (!bno.begin())
+  {
     /* There was a problem detecting the BNO055 ... check your connections */
     SERIAL_USB.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
     delay(200);
@@ -78,8 +82,10 @@ void setup()
   SERIAL_USB.print("IMU found\n");
   bno.setExtCrystalUse(true);
 
-  for (int i = 0; i < 4; i++) {
-    for (int j = 0; j < 6; j++) {
+  for (int i = 0; i < 4; i++)
+  {
+    for (int j = 0; j < 6; j++)
+    {
       K[i][j] *= LQRmult;
     }
   }
@@ -100,72 +106,71 @@ void setup()
   setPoint.Rcal[2] = setPoint.R[2];
   delay(500);
   bool check = false;
-  while (!check) {
+  while (!check)
+  {
     get_Distance_sample();
     int t1 = liDARval;
     delay(100);
     get_Distance_sample();
     int t2 = liDARval;
-    if (t1 == t2) {
+    if (t1 == t2)
+    {
       check = true;
     }
     //initAlt = (t1 + t2) / 2;
   }
-
 }
 
 /*-------------------------------------------------------------------------------
    main
   ------------------------------------------------------------------------------*/
-void loop(void) {
+void loop(void)
+{
 
   dt = micros() - t;
   t = micros();
   dt = dt / 1000000;
 
+  get_IMU_sample(),
+      get_Distance_sample(),
+          ELQR_calc();
 
-  get_Distance_sample();
-
-  _lidar = (1 - filtAlt) * liDARval + filtAlt * liDARold;
-  liDARold = _lidar;
-  double _alt = _lidar * cos(euler.x) * cos(euler.y);
-  altitude.d_alt *= filtAlt;
-  altitude.d_alt += (1 - filtAlt) * (_alt - altitude.alt) / dt;
-  altitude.alt = _alt;
-
-
-  get_IMU_sample();
-  ELQR_calc();
- 
-
-  if (VERT_SPEED == true) {
+  if (VERT_SPEED == true)
+  {
     vertSpeedHold();
   }
   receiveData();
 
-  if(count%5==0){
+  if (count % 5 == 0)
+  {
     printData();
   }
 
   // Make sure Vehicle isn't dying
   OS(); // Oh Sh*t method
 
-  if ((TAKEOFF_FLAG) && (millis() > 2000)) {
+  if ((TAKEOFF_FLAG) && (millis() > 2000))
+  {
     IntegralTracker();
   }
 
-  if (count < 1000) {
-    for (int i = 1; i < 4; i++) {
+  if (count < 1000)
+  {
+    for (int i = 1; i < 4; i++)
+    {
       signal.Ucal[i] = signal.U[i];
     }
-
-  } else {
-    if (!STOP_FLAG) {
+  }
+  else
+  {
+    if (!STOP_FLAG)
+    {
       commandESCs();
-    } else {
+    }
+    else
+    {
       STOP();
     }
-
   }
   count++;
   delay(MAIN_DELAY);
