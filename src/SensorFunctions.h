@@ -23,16 +23,8 @@ struct Signal
          Ucal[4];
 };
 
-u_int16_t counter = 0;
-
 volatile float liDARold = 0,
                _lidar = 0;
-
-unsigned int checksum = 0,
-             check2 = 0,
-             check1,
-             Xrot = 360,
-             Yrot = 360;
 
 volatile int liDARval = 0,
              strength = 0;
@@ -74,8 +66,11 @@ struct Setpoint
 };
 
 uint16_t Ncode;
-char Dcode[3];
+u_int16_t counter = 0;
+
 String STATE = "STARTUP";
+
+char Dcode[3];
 
 bool STOP_FLAG = false;
 bool TAKEOFF_FLAG = true;
@@ -88,15 +83,15 @@ Altitude altitude; // altitude data
 Signal signal;     // controller output data
 
 /* ================================================================== ======================
-  Declare Library Objects
+  Declare Sensor Connections on I2C bus
 */
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28);
 
 Servo esc1,
-    esc2,
-    esc3,
-    esc4;
+      esc2,
+      esc3,
+      esc4;
 
 /*-------------------------------------------------------------------------
    Write external functions

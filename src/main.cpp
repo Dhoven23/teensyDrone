@@ -3,7 +3,8 @@
 
 /* --------------------------------------------------------------------------------------
   Main Controller Code to run on Teensy 4.0
-  Author: Daniel Hoven Date: 3/15/2021 Project: Senior Capstone
+  Author: Daniel Hoven
+  Project: Senior Capstone
   --------------------------------------------------------------------------------------*/
 /*= == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == = == == == == == == == =
 SETUP 
@@ -40,7 +41,7 @@ void setup()
 
   while (!bno.begin())
   {
-    /* There was a problem detecting the BNO055 ... check your connections */
+ 
     SERIAL_USB.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
     delay(200);
   }
@@ -71,25 +72,9 @@ void setup()
   setPoint.Rcal[1] = setPoint.R[1];
   setPoint.Rcal[2] = setPoint.R[2];
   delay(500);
-  bool check = false;
-  while (!check)
-  {
-    get_Distance_sample(global.dt);
-    int t1 = altitude.alt;
-    delay(100);
-    get_Distance_sample(global.dt);
-    int t2 = altitude.alt;
-    if (t1 == t2)
-    {
-      check = true;
-    }
-    //initAlt = (t1 + t2) / 2;
-  }
+
 }
 
-/*-------------------------------------------------------------------------------
-   main
-  ------------------------------------------------------------------------------*/
 void loop(void)
 {
 
