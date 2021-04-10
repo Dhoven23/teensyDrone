@@ -1,23 +1,25 @@
 /* =========================================================================================
   Define controller constants */
 
+#define THROTTLE_SCALER 1
 #define kp 2                               // Altitude PID proportional constant 
 #define ki 0                              // Altitude PID integral constant
 #define kd 0.01                          // Altitude PID derivative constant
 #define filtAlt 0.95                    // Altitude Estimation Filter constant (0-1)
-#define LQRmult 0.5                  // Scaling factor for control law, varies between 0.5-1
-#define LQR_P 0.1                     // LQR_P constant proportional prescaler
-#define LQR_E 1.8                   // Integrator prescaler
-#define INTEGRATOR_CLAMP 0.175       // Clamping term for integrator 
+#define LQRmult 0.45                   // Scaling factor for control law, varies between 0.5-1
+#define LQR_P .25                     // LQR_P constant proportional prescaler
+#define LQR_E 1.75                   // Integrator prescaler
+#define INTEGRATOR_CLAMP 0.175      // Clamping term for integrator 
 #define SLEW_LIMIT 10              // controller gimbal limit (higher = faster vehicle)
-#define SLEW_FILTER 0.5          // Controller rate limiter (0-1), higher = slower/stabler
-#define D_COMP 0.1             // dynamic damping coefficient. higher = more dynamic, lower = more damping
-#define V_SPD 0.01              // Vertical speed reduction rate (depends on iteration time, faster code = lower value, typically 0.001-0.01)
+#define SLEW_FILTER 0           // Controller rate limiter (0-1), higher = slower/stabler
+#define D_COMP 0.2             // dynamic damping coefficient. higher = more dynamic, lower = more damping
+#define V_SPD 0.05              // Vertical speed reduction rate (depends on iteration time, faster code = lower value, typically 0.001-0.01)
 #define DERIVATIVE_FILT 0.75   // Fintering term for low pass derivative filter
+#define INTEGRAL_STARTUP false
 
 /* ==========================================================================================
-  Define communication setup */
-
+  Define communication setup
+*/
 #ifndef RADIO_BAUDRATE
 #define RADIO_BAUDRATE 57600    // Telemetry radio baudrates (use 57600)
 #endif
@@ -40,7 +42,7 @@
 #define LIDAR_SERIAL Serial1    // Serial port for LiDAR sensor
 #endif
 
-#define CMD_SERIAL Serial      // Listen port for waypoints
+#define CMD_SERIAL Serial      // Listen port for setpoints
 #define TELEMETRY1 Serial4     // wireless telemetry
 #define TELEMETRY2 Serial      // wired telemetry
 
@@ -53,7 +55,12 @@
 #define ESC4 4         // Pin for ESC4
 #define MAXVAL 1500    // highest speed controller may command esc
 #define MINVAL 900     // lowest speed controller may command esc (other than 0)
-#define IDLE_SPEED 17.5  // idle motor speed, range 12-20 ish, depending on esc calibration
+#define IDLE_SPEED 20  // idle motor speed, range 12-20 ish, depending on esc calibration
+
+#define E1CENTER 1         // Pin for ESC1
+#define E2CENTER 1         // Pin for ESC2
+#define E3CENTER 1         // Pin for ESC3
+#define E4CENTER 1         // Pin for ESC4
 
 /* Set the delay between iterations */
 #define MAIN_DELAY 1
@@ -82,10 +89,10 @@ represent response to angular position about X, and angular speed about X)
 double K [4][6] = {{
     0, 0, 0, 0, 0, 0,
   }, {
-    17.5, 0, 0, -100, 0, 0,
+    15, 0, 0, -100, 0, 0,
   }, {
-    0, 17.5, 0, 0, -100, 0,
+    0, 15, 0, 0, -100, 0,
   }, {
-    0, 0, 5, 0, -10, 0,
+    0, 0, 15, 0, -30, 0,
   },
 };

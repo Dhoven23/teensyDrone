@@ -8,7 +8,7 @@
 #include <avr/interrupt.h>
 #include <Servo.h>
 
-/* ================================================================== =======================
+/* ==========================================================================================
   Declare globals */
 
 struct Signal
@@ -17,10 +17,17 @@ struct Signal
         e2 = 0,
         e3 = 0,
         e4 = 0,
+        e1_HOLD = 0,
+        e2_HOLD = 0,
+        e3_HOLD = 0,
+        e4_HOLD = 0,
         Ecal[4] = {0, 0, 0, 0};
+  
+  int throttle = 0;
 
   double U[4] = {IDLE_SPEED, 0, 0, 0},
          Ucal[4];
+
 };
 
 volatile float liDARold = 0,
@@ -46,8 +53,8 @@ struct State
 {
   double Full[6] = {0, 0, 0, 0, 0, 0},
          Integral[6],
-         Old[6];
-  double Error[6];
+         Old[6],
+         Error[6];
 };
 
 struct Altitude
@@ -65,33 +72,45 @@ struct Setpoint
   double verticalSpeed = 0;
 };
 
-uint16_t Ncode;
+struct Global
+{
+  long int iterations = 0;
+  int tMicros = 0;
+  double dt = 0;
+
+  String STATE = "STARTUP";
+
+  bool STOP_FLAG = false,
+       STOP_FLAG_LAST = false,
+       TAKEOFF_FLAG = INTEGRAL_STARTUP,
+       VERT_SPEED = false,
+       VERT_SPEED_LAST = false;
+};
+
+float Ncode;
 u_int16_t counter = 0;
 
 String STATE = "STARTUP";
 
 char Dcode[3];
 
-bool STOP_FLAG = false;
-bool TAKEOFF_FLAG = true;
-bool VERT_SPEED = false;
-
 State X;           // Vehicle Full state struct
 Euler euler;       // Euler angle struct
 Setpoint setPoint; // setpoint struct
 Altitude altitude; // altitude data
 Signal signal;     // controller output data
+Global global;
 
-/* ================================================================== ======================
+/* =========================================================================================
   Declare Sensor Connections on I2C bus
 */
 
 Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28);
 
 Servo esc1,
-      esc2,
-      esc3,
-      esc4;
+    esc2,
+    esc3,
+    esc4;
 
 /*-------------------------------------------------------------------------
    Write external functions
@@ -113,13 +132,13 @@ void calibrateESCs()
 {
 
   esc1.attach(ESC1);
-  esc2.attach(ESC2);
-  esc3.attach(ESC3);
-  esc4.attach(ESC4);
-  delay(100);
-  esc1.write(30);
-  esc2.write(30);
-  esc3.write(30);
+   esc2.attach(ESC2);
+    esc3.attach(ESC3);
+     esc4.attach(ESC4);
+      delay(100);
+     esc1.write(30);
+    esc2.write(30);
+   esc3.write(30);
   esc4.write(30);
   delay(1000);
 
@@ -128,6 +147,7 @@ void calibrateESCs()
     esc1.write(i);
     esc2.write(i);
     esc3.write(i);
+    esc4.write(i);
   }
 
   for (int i = 20; i < 35; i++)
@@ -145,7 +165,6 @@ void calibrateESCs()
   esc4.write(40);
   delay(2000);
 }
-
 
 FASTRUN void get_IMU_sample(double dt, double iterations)
 {
@@ -193,7 +212,7 @@ FASTRUN void get_IMU_sample(double dt, double iterations)
     }
     else
     {
-      X.Full[i + 3] = .1;
+      X.Full[i + 3] = .1; // prime derivatives with nonzero values
     }
   }
 }
@@ -333,12 +352,12 @@ void STOP()
   esc3.write(30);
   esc4.write(30);
 }
-void OS()
+void CheckAttitudeLimits()
 {
   if (upsideDown())
   {
     STOP();
-    STOP_FLAG = true;
+    global.STOP_FLAG = true;
   }
   else if (goingToCrash())
   {
@@ -352,17 +371,21 @@ void OS()
 void vertSpeedHold()
 {
   double ERR = setPoint.verticalSpeed - altitude.d_alt;
-  signal.e1 += ERR * V_SPD;
-  signal.e2 += ERR * V_SPD;
-  signal.e3 += ERR * V_SPD;
-  signal.e4 += ERR * V_SPD;
+  signal.e1_HOLD += ERR * V_SPD;
+  signal.e2_HOLD += ERR * V_SPD;
+  signal.e3_HOLD += ERR * V_SPD;
+  signal.e4_HOLD += ERR * V_SPD;
+  signal.e1 += signal.e1_HOLD;
+  signal.e2 += signal.e2_HOLD;
+  signal.e3 += signal.e3_HOLD;
+  signal.e4 += signal.e4_HOLD;
+
 }
 
 void AltitudePID()
 {
   double AltitudeError = setPoint.Alt - altitude.alt;
-  setPoint.verticalSpeed = kp*AltitudeError + kd*altitude.d_alt;
-
+  setPoint.verticalSpeed = kp * AltitudeError + kd * altitude.d_alt;
 }
 
 void commandESCs()
@@ -370,38 +393,48 @@ void commandESCs()
   // Motor Mixing Algorithm
 
   float _e1 = signal.U[0] - signal.U[1] + signal.U[2] + signal.U[3];
-  float _e2 = signal.U[0] - signal.U[1] - signal.U[2] - signal.U[3];
-  float _e3 = signal.U[0] + signal.U[1] - signal.U[2] + signal.U[3];
-  float _e4 = signal.U[0] + signal.U[1] + signal.U[2] - signal.U[3];
+   float _e2 = signal.U[0] - signal.U[1] - signal.U[2] - signal.U[3];
+    float _e3 = signal.U[0] + signal.U[1] - signal.U[2] + signal.U[3];
+     float _e4 = signal.U[0] + signal.U[1] + signal.U[2] - signal.U[3];
 
-  _e1 = map(_e1, 0, 180, 1000, 2000);
-  _e2 = map(_e2, 0, 180, 1000, 2000);
-  _e3 = map(_e3, 0, 180, 1000, 2000);
+     _e1 = map(_e1, 0, 180, 1000, 2000);
+    _e2 = map(_e2, 0, 180, 1000, 2000);
+   _e3 = map(_e3, 0, 180, 1000, 2000);
   _e4 = map(_e4, 0, 180, 1000, 2000);
 
   signal.e1 *= (SLEW_FILTER);
-  signal.e2 *= (SLEW_FILTER);
-  signal.e3 *= (SLEW_FILTER);
-  signal.e4 *= (SLEW_FILTER);
+   signal.e2 *= (SLEW_FILTER);
+    signal.e3 *= (SLEW_FILTER);
+     signal.e4 *= (SLEW_FILTER);
 
-  signal.e1 += (1 - SLEW_FILTER) * _e1;
-  signal.e2 += (1 - SLEW_FILTER) * _e2;
-  signal.e3 += (1 - SLEW_FILTER) * _e3;
+     signal.e1 += (1 - SLEW_FILTER) * _e1;
+    signal.e2 += (1 - SLEW_FILTER) * _e2;
+   signal.e3 += (1 - SLEW_FILTER) * _e3;
   signal.e4 += (1 - SLEW_FILTER) * _e4;
+
+  signal.e1 *= E1CENTER;
+   signal.e2 *= E2CENTER;
+    signal.e3 *= E3CENTER;
+     signal.e4 *= E4CENTER;
+
+     signal.e1 += signal.throttle;
+   signal.e2 += signal.throttle;
+  signal.e3 += signal.throttle;
+signal.e4 += signal.throttle;
 
   if ((signal.Ecal[0] + signal.Ecal[1] + signal.Ecal[2] + signal.Ecal[3]) == 0)
   {
 
     float eAv = (signal.e1 + signal.e2 + signal.e3 + signal.e4) / 4;
     signal.Ecal[0] = eAv - signal.e1;
-    signal.Ecal[1] = eAv - signal.e2;
-    signal.Ecal[2] = eAv - signal.e3;
-    signal.Ecal[3] = eAv - signal.e4;
+     signal.Ecal[1] = eAv - signal.e2;
+      signal.Ecal[2] = eAv - signal.e3;
+       signal.Ecal[3] = eAv - signal.e4;
   }
 
-  signal.e1 += signal.Ecal[0];
-  signal.e2 += signal.Ecal[1];
-  signal.e3 += signal.Ecal[2];
+     signal.e1 += signal.Ecal[0];
+    signal.e2 += signal.Ecal[1];
+   signal.e3 += signal.Ecal[2];
   signal.e4 += signal.Ecal[3];
 
   if ((signal.e1 < MAXVAL) && (signal.e1 > MINVAL))
@@ -459,19 +492,20 @@ void printData()
 {
 
   TELEMETRY1.print(millis());
-  TELEMETRY1.print(", 1:,"), TELEMETRY1.print((int)signal.e1);
-  TELEMETRY1.print(", 2:,"), TELEMETRY1.print((int)signal.e2);
-  TELEMETRY1.print(", 3:,"), TELEMETRY1.print((int)signal.e3);
-  TELEMETRY1.print(", 4:,"), TELEMETRY1.print((int)signal.e4);
-
-  TELEMETRY1.print(", roll:,"), TELEMETRY1.print(X.Full[0], 3);
-  TELEMETRY1.print(", pirch:,"), TELEMETRY1.print(X.Full[1], 3);
-  TELEMETRY1.print(", yaw:,"), TELEMETRY1.print(X.Full[2], 3);
-  TELEMETRY1.print(", "), TELEMETRY1.print(X.Full[3], 3);
-  TELEMETRY1.print(", "), TELEMETRY1.print(X.Full[4], 3);
-  TELEMETRY1.print(", "), TELEMETRY1.print(X.Full[5], 3);
-  TELEMETRY1.print("Alt:,"), TELEMETRY1.print(altitude.alt);
-  if (TAKEOFF_FLAG)
+   TELEMETRY1.print(",1:,"), TELEMETRY1.print((int)signal.e1);
+    TELEMETRY1.print(",2:,"), TELEMETRY1.print((int)signal.e2);
+     TELEMETRY1.print(",3:,"), TELEMETRY1.print((int)signal.e3);
+      TELEMETRY1.print(",4:,"), TELEMETRY1.print((int)signal.e4);
+       TELEMETRY1.print(",roll:,"), TELEMETRY1.print(X.Full[0], 3);
+       TELEMETRY1.print(",pitch:,"), TELEMETRY1.print(X.Full[1], 3);
+      TELEMETRY1.print(",yaw:,"), TELEMETRY1.print(X.Full[2], 3);
+     TELEMETRY1.print(","), TELEMETRY1.print(X.Full[3], 3);
+    TELEMETRY1.print(","), TELEMETRY1.print(X.Full[4], 3);
+   TELEMETRY1.print(","), TELEMETRY1.print(X.Full[5], 3);
+  TELEMETRY1.print(",Alt:,"), TELEMETRY1.print(altitude.alt);
+   TELEMETRY1.print("throttle,"), TELEMETRY1.print(signal.throttle);
+  
+  if (global.TAKEOFF_FLAG)
   {
     TELEMETRY1.print(",Integrators ON, ");
   }
@@ -479,7 +513,7 @@ void printData()
   {
     TELEMETRY1.print(",Integrators OFF, ");
   }
-  if (VERT_SPEED)
+  if (global.VERT_SPEED)
   {
     TELEMETRY1.print(", VERT_SPD_HOLD = true");
   }
@@ -488,6 +522,11 @@ void printData()
     TELEMETRY1.print(", VERT_SPD_HOLD = false");
   }
   TELEMETRY1.println();
+}
+
+void printTestData()
+{
+  TELEMETRY1.println(Ncode);
 }
 
 void receiveData()
@@ -500,101 +539,93 @@ void receiveData()
     {
 
       char temp = CMD_SERIAL.read();
-      uint16_t t1 = CMD_SERIAL.read();
-      uint16_t t2 = CMD_SERIAL.read();
+      uint8_t t1 = CMD_SERIAL.read();
 
-      t2 <<= 8;
-      t1 += t2;
+      Ncode = t1;
 
-      if (!((Dcode[0] == 'N') || (Dcode[1] == 'A')))
+      if (temp == 'a') // read incoming pitch command
       {
-        Ncode = t1;
-
-        if (temp == 'a')
+        if ((Ncode >= 0) && (Ncode <= 255))
         {
-          Dcode[0] = '-', Dcode[1] = 'x';
-          setPoint.R[0] += 0.01;
-          digitalWrite(13, HIGH);
-        }
-        else if (temp == 'w')
-        {
-          Dcode[0] = '+', Dcode[1] = 'y';
-          setPoint.R[1] += 0.01;
-          digitalWrite(13, HIGH);
-        }
-        else if (temp == 's')
-        {
-          Dcode[0] = '-', Dcode[1] = 'y';
-          setPoint.R[1] -= 0.01;
-          digitalWrite(13, HIGH);
-        }
-        else if (temp == 'd')
-        {
-          Dcode[0] = '+', Dcode[1] = 'x';
-          setPoint.R[0] -= 0.01;
-          digitalWrite(13, HIGH);
-        }
-        else if (temp == 'q')
-        {
-          signal.U[3] += 1;
-        }
-        else if (temp == 'e')
-        {
-          signal.U[3] -= 1;
-        }
-        else if (temp == 'V')
-        {
-          VERT_SPEED = !VERT_SPEED;
-        }
-        else if (temp == 'I')
-        {
-          TAKEOFF_FLAG = !(TAKEOFF_FLAG);
-        }
-        else if (temp == 'H')
-        {
-          Dcode[0] = 'H',
-          Dcode[1] = 'O';
-          setPoint.R[0] = setPoint.Rcal[0];
-          setPoint.R[1] = setPoint.Rcal[1];
-          STOP_FLAG = false;
-
-          digitalWrite(13, HIGH);
-        }
-        else if (temp == 'Y')
-        {
-          STOP_FLAG = false;
-        }
-        else if (temp == 'r')
-        {
-          Dcode[0] = '+',
-          Dcode[1] = 'z';
-          signal.U[0] += t1;
-          VERT_SPEED = false;
-        }
-        else if (temp == 'f')
-        {
-          Dcode[0] = '-',
-          Dcode[1] = 'z';
-          signal.U[0] -= t1;
-          VERT_SPEED = false;
-
-          digitalWrite(13, HIGH);
-        }
-        else if (temp == 'K')
-        {
-          signal.U[0] = 0;
-          STOP_FLAG = true;
-        }
-        else
-        {
-          Dcode[0] = 'N', Dcode[1] = 'A';
+          Ncode -= 128;
+          Ncode *= (0.1);
+          Ncode *= PI/180;
+          setPoint.R[0] = Ncode;
+          
         }
       }
-      digitalWrite(13, LOW);
+      else if (temp == 'w') // read incoming roll command
+      {
+        if ((Ncode >= 0) && (Ncode <= 255))
+        {
+          Ncode -= 128;
+          Ncode *= (0.1);
+          Ncode *= PI/180;
+          setPoint.R[1] = Ncode;
+        }
+      }
+      else if (temp == 'q') // read incoming yaw command
+      {
+        Ncode -= 128;
+          Ncode *= (0.1);
+            Ncode *= PI/180;
+              setPoint.R[2] = Ncode;
+      }
+      else if (temp == 'r') // read incoming throttle command
+      {
+        Ncode -= 128;
+        int throttle = (Ncode)*THROTTLE_SCALER;
+        signal.throttle = throttle;
+      }
+      else if (temp == 'V')
+      {
+        if(((bool)t1 != global.VERT_SPEED_LAST))
+        {
+          if(t1 == 1)
+          {
+            global.VERT_SPEED = !global.VERT_SPEED;
+            if(global.VERT_SPEED = false)
+            {
+              signal.e1 -= signal.e1_HOLD;
+              signal.e1_HOLD = 0;
+              signal.e2 -= signal.e2_HOLD;
+              signal.e2_HOLD = 0;
+              signal.e3 -= signal.e3_HOLD;
+              signal.e3_HOLD = 0;
+              signal.e4 -= signal.e4_HOLD;
+              signal.e4_HOLD = 0;
+
+            }
+          }
+          global.VERT_SPEED_LAST = t1;
+        }
+        
+      }
+      else if (temp == 'I')
+      {
+        global.TAKEOFF_FLAG = !(global.TAKEOFF_FLAG);
+      }
+      else if (temp == 'H')
+      {
+        if((bool)t1 != global.STOP_FLAG_LAST)
+        {
+          if(t1 == 1)
+          {
+            global.STOP_FLAG = !global.STOP_FLAG;
+          }
+        }
+        global.STOP_FLAG_LAST = t1;
+
+      }
+      else if (temp == 'Y')
+      {
+        global.STOP_FLAG = false;
+      }
+      else if (temp == 'K')
+      {
+        signal.U[0] = 0;
+        global.STOP_FLAG = true;
+      }
     }
-  }
-  else
-  {
-    digitalWrite(13, LOW);
   }
 }

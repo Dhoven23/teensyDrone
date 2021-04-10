@@ -13,6 +13,3 @@ To use this project, you must have:
 5. A TFMini Plus Lidar (or equivalent)
 6. 4s brushless motors
 7. a frame of your choice (files included)
-
-
-

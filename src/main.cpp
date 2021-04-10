@@ -3,27 +3,11 @@
 
 /* --------------------------------------------------------------------------------------
   Main Controller Code to run on Teensy 4.0
-  Author: Daniel Hoven
-  Project: Senior Capstone
+  Author: Daniel Hoven Date: 3/15/2021 Project: Senior Capstone
   --------------------------------------------------------------------------------------*/
 /*= == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == == = == == == == == == == =
 SETUP 
 */
-
-struct Global
-{
-  long int iterations = 0;
-  int tMicros = 0;
-  double dt = 0;
-
-  String STATE = "STARTUP";
-
-  bool STOP_FLAG = false,
-       TAKEOFF_FLAG = true,
-       VERT_SPEED = false;
-};
-
-Global global;
 
 void setup()
 
@@ -41,7 +25,7 @@ void setup()
 
   while (!bno.begin())
   {
- 
+    /* There was a problem detecting the BNO055 ... check your connections */
     SERIAL_USB.print("Ooops, no BNO055 detected ... Check your wiring or I2C ADDR!");
     delay(200);
   }
@@ -59,22 +43,11 @@ void setup()
 
   calibrateESCs();
   delay(500);
-
-  get_IMU_sample(global.dt, global.iterations);
-  delay(10);
-
-  get_IMU_sample(0.1, 0.1);
-  setPoint.R[0] = euler.x;
-  setPoint.R[1] = euler.y;
-  setPoint.R[2] = euler.z;
-
-  setPoint.Rcal[0] = setPoint.R[0];
-  setPoint.Rcal[1] = setPoint.R[1];
-  setPoint.Rcal[2] = setPoint.R[2];
-  delay(500);
-
 }
 
+/*-------------------------------------------------------------------------------
+   main
+  ------------------------------------------------------------------------------*/
 void loop(void)
 {
 
@@ -82,11 +55,11 @@ void loop(void)
   global.tMicros = micros();
   global.dt = global.dt / 1000000;
 
-  get_IMU_sample(global.dt, global.iterations),
-      get_Distance_sample(global.dt),
-      ELQR_calc();
+  get_IMU_sample(global.dt,global.iterations),
+  get_Distance_sample(global.dt),
+  ELQR_calc();
 
-  if (VERT_SPEED == true)
+  if (global.VERT_SPEED == true)
   {
     vertSpeedHold();
   }
@@ -95,14 +68,17 @@ void loop(void)
   if (global.iterations % 5 == 0)
   {
     printData();
+    //printTestData();
   }
+  
 
   // Make sure Vehicle isn't dying
-  OS(); // Oh Sh*t method
+  CheckAttitudeLimits(); // Oh Sh*t method
 
-  if ((TAKEOFF_FLAG) && (millis() > 2000))
+  if ((global.TAKEOFF_FLAG) && (millis() > 2000))
   {
     IntegralTracker(global.dt);
+    AltitudePID();
   }
 
   if (global.iterations < 1000)
@@ -114,7 +90,7 @@ void loop(void)
   }
   else
   {
-    if (!STOP_FLAG)
+    if (!global.STOP_FLAG)
     {
       commandESCs();
     }
@@ -123,8 +99,6 @@ void loop(void)
       STOP();
     }
   }
-
   global.iterations++;
-
   delay(MAIN_DELAY);
 }
